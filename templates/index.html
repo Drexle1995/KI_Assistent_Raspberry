@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KI-Assistent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green: #1D9E75; --green-light: #E1F5EE; --green-mid: #5DCAA5; --green-dark: #0F6E56;
+    --bg: #0e1117; --bg2: #161b24; --bg3: #1c2333;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #e8eaf0; --text2: #8b92a5; --text3: #555e72;
+    --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans', sans-serif;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+  body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .header h1 { font-family: var(--mono); font-size: 15px; font-weight: 500; color: var(--text); letter-spacing: -0.02em; }
+  .header-sub { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .clear-btn { font-family: var(--mono); font-size: 11px; color: var(--text3); background: none; border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
+  .clear-btn:hover { color: var(--text2); border-color: var(--border2); }
+  .mode-panel { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 10px 20px; flex-shrink: 0; }
+  .mode-group { margin-bottom: 7px; display: flex; align-items: flex-start; gap: 8px; }
+  .mode-group:last-child { margin-bottom: 0; }
+  .group-label { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 0.06em; min-width: 70px; padding-top: 5px; flex-shrink: 0; }
+  .btn-wrap { display: flex; flex-wrap: wrap; gap: 4px; }
+  .mode-btn { font-family: var(--mono); font-size: 11px; padding: 4px 9px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .mode-btn:hover { border-color: var(--border2); color: var(--text); }
+  .mode-btn.active { background: var(--green-dark); color: #a8f0d8; border-color: var(--green); }
+  .mode-btn.assist-btn { border-color: rgba(29,158,117,0.3); color: var(--green-mid); }
+  .mode-btn.assist-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+  .chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+  .chat::-webkit-scrollbar { width: 4px; }
+  .chat::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  .msg-row { display: flex; flex-direction: column; }
+  .msg-row.user { align-items: flex-end; }
+  .msg-row.bot { align-items: flex-start; }
+  .msg-meta { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; padding: 0 2px; }
+  .msg { max-width: 75%; padding: 10px 14px; border-radius: 2px; font-size: 14px; line-height: 1.6; font-family: var(--sans); font-weight: 300; }
+  .msg.user { background: var(--green-dark); color: #c8f5e8; border-top-right-radius: 10px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+  .msg.bot { background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-top-left-radius: 10px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+  .msg.error { background: rgba(216,90,48,0.1); border-color: rgba(216,90,48,0.3); color: #f09979; }
+  .tts-row { display: flex; align-items: center; gap: 7px; padding: 0 2px; }
+  .wave-bars { display: flex; gap: 2px; align-items: center; }
+  .wave-bars span { width: 2px; height: 8px; background: var(--green); border-radius: 2px; animation: waveanim 1s ease-in-out infinite; }
+  .wave-bars span:nth-child(2) { animation-delay: .15s; height: 14px; }
+  .wave-bars span:nth-child(3) { animation-delay: .3s; }
+  @keyframes waveanim { 0%,100%{transform:scaleY(0.4)} 50%{transform:scaleY(1)} }
+  .tts-label { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+  #typing-indicator { display: none; }
+  .typing-dots { display: flex; gap: 4px; align-items: center; padding: 12px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 2px; border-top-left-radius: 10px; border-bottom-right-radius: 10px; border-bottom-left-radius: 10px; width: fit-content; }
+  .typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: typing 1.2s ease-in-out infinite; }
+  .typing-dots span:nth-child(2) { animation-delay: .2s; }
+  .typing-dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes typing { 0%,100%{opacity:0.3;transform:translateY(0)} 50%{opacity:1;transform:translateY(-3px)} }
+  #tts-indicator { display: none; }
+  .input-area { background: var(--bg2); border-top: 1px solid var(--border); padding: 14px 20px; flex-shrink: 0; }
+  .input-row { display: flex; gap: 8px; align-items: center; }
+  .mic-btn { width: 38px; height: 38px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+  .mic-btn:hover { border-color: var(--border2); color: var(--text); }
+  .mic-btn.recording { background: rgba(216,90,48,0.15); border-color: #D85A30; animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(216,90,48,0.3)} 50%{box-shadow:0 0 0 6px rgba(216,90,48,0)} }
+  #user-input { flex: 1; height: 38px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--sans); font-size: 14px; font-weight: 300; padding: 0 14px; outline: none; transition: border-color 0.15s; }
+  #user-input:focus { border-color: var(--green-dark); }
+  #user-input::placeholder { color: var(--text3); }
+  .send-btn { width: 38px; height: 38px; border-radius: 6px; background: var(--green); border: none; color: white; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; }
+  .send-btn:hover { background: var(--green-dark); }
+  .input-hint { font-family: var(--mono); font-size: 10px; color: var(--text3); text-align: center; margin-top: 7px; }
+  #mic-status { display: none; text-align: center; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: #D85A30; align-items: center; justify-content: center; gap: 6px; }
+  .mic-wave { display: inline-flex; gap: 2px; align-items: center; }
+  .mic-wave span { width: 3px; height: 8px; background: #D85A30; border-radius: 2px; animation: waveanim 1s ease-in-out infinite; }
+  .mic-wave span:nth-child(2) { height: 14px; animation-delay: .15s; }
+  .mic-wave span:nth-child(3) { animation-delay: .3s; }
+  #current-mode-display { font-family: var(--mono); font-size: 11px; color: var(--green-mid); background: rgba(29,158,117,0.1); border: 1px solid rgba(29,158,117,0.25); border-radius: 4px; padding: 3px 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="status-dot"></div>
+    <div>
+      <h1>KI-Assistent</h1>
+      <div class="header-sub">Raspberry Pi 5 · Claude API</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div id="current-mode-display">🤖 Assistent</div>
+    <button class="clear-btn" onclick="clearChat()">Chat leeren</button>
+  </div>
+</div>
+
+<div class="mode-panel">
+  <div class="mode-group">
+    <span class="group-label">MODUS</span>
+    <div class="btn-wrap">
+      <button class="mode-btn assist-btn active" data-mode="assistent" data-label="🤖 Assistent" onclick="setMode(this)">🤖 Assistent</button>
+    </div>
+  </div>
+  <div class="mode-group">
+    <span class="group-label">→ DEUTSCH</span>
+    <div class="btn-wrap">
+      <button class="mode-btn" data-mode="fr_de" data-label="🇫🇷 FR → DE" onclick="setMode(this)">🇫🇷 FR</button>
+      <button class="mode-btn" data-mode="en_de" data-label="🇬🇧 EN → DE" onclick="setMode(this)">🇬🇧 EN</button>
+      <button class="mode-btn" data-mode="es_de" data-label="🇪🇸 ES → DE" onclick="setMode(this)">🇪🇸 ES</button>
+      <button class="mode-btn" data-mode="it_de" data-label="🇮🇹 IT → DE" onclick="setMode(this)">🇮🇹 IT</button>
+      <button class="mode-btn" data-mode="pt_de" data-label="🇵🇹 PT → DE" onclick="setMode(this)">🇵🇹 PT</button>
+      <button class="mode-btn" data-mode="nl_de" data-label="🇳🇱 NL → DE" onclick="setMode(this)">🇳🇱 NL</button>
+      <button class="mode-btn" data-mode="pl_de" data-label="🇵🇱 PL → DE" onclick="setMode(this)">🇵🇱 PL</button>
+      <button class="mode-btn" data-mode="sv_de" data-label="🇸🇪 SV → DE" onclick="setMode(this)">🇸🇪 SV</button>
+      <button class="mode-btn" data-mode="ro_de" data-label="🇷🇴 RO → DE" onclick="setMode(this)">🇷🇴 RO</button>
+      <button class="mode-btn" data-mode="hr_de" data-label="🇭🇷 HR → DE" onclick="setMode(this)">🇭🇷 HR</button>
+      <button class="mode-btn" data-mode="sr_de" data-label="🇷🇸 SR → DE" onclick="setMode(this)">🇷🇸 SR</button>
+      <button class="mode-btn" data-mode="cs_de" data-label="🇨🇿 CS → DE" onclick="setMode(this)">🇨🇿 CS</button>
+      <button class="mode-btn" data-mode="sk_de" data-label="🇸🇰 SK → DE" onclick="setMode(this)">🇸🇰 SK</button>
+      <button class="mode-btn" data-mode="el_de" data-label="🇬🇷 EL → DE" onclick="setMode(this)">🇬🇷 EL</button>
+      <button class="mode-btn" data-mode="hu_de" data-label="🇭🇺 HU → DE" onclick="setMode(this)">🇭🇺 HU</button>
+      <button class="mode-btn" data-mode="da_de" data-label="🇩🇰 DA → DE" onclick="setMode(this)">🇩🇰 DA</button>
+      <button class="mode-btn" data-mode="fi_de" data-label="🇫🇮 FI → DE" onclick="setMode(this)">🇫🇮 FI</button>
+    </div>
+  </div>
+  <div class="mode-group">
+    <span class="group-label">DEUTSCH →</span>
+    <div class="btn-wrap">
+      <button class="mode-btn" data-mode="de_fr" data-label="🇩🇪 DE → FR" onclick="setMode(this)">🇫🇷 FR</button>
+      <button class="mode-btn" data-mode="de_en" data-label="🇩🇪 DE → EN" onclick="setMode(this)">🇬🇧 EN</button>
+      <button class="mode-btn" data-mode="de_es" data-label="🇩🇪 DE → ES" onclick="setMode(this)">🇪🇸 ES</button>
+      <button class="mode-btn" data-mode="de_it" data-label="🇩🇪 DE → IT" onclick="setMode(this)">🇮🇹 IT</button>
+      <button class="mode-btn" data-mode="de_pt" data-label="🇩🇪 DE → PT" onclick="setMode(this)">🇵🇹 PT</button>
+      <button class="mode-btn" data-mode="de_nl" data-label="🇩🇪 DE → NL" onclick="setMode(this)">🇳🇱 NL</button>
+      <button class="mode-btn" data-mode="de_pl" data-label="🇩🇪 DE → PL" onclick="setMode(this)">🇵🇱 PL</button>
+      <button class="mode-btn" data-mode="de_sv" data-label="🇩🇪 DE → SV" onclick="setMode(this)">🇸🇪 SV</button>
+      <button class="mode-btn" data-mode="de_ro" data-label="🇩🇪 DE → RO" onclick="setMode(this)">🇷🇴 RO</button>
+      <button class="mode-btn" data-mode="de_hr" data-label="🇩🇪 DE → HR" onclick="setMode(this)">🇭🇷 HR</button>
+      <button class="mode-btn" data-mode="de_cs" data-label="🇩🇪 DE → CS" onclick="setMode(this)">🇨🇿 CS</button>
+      <button class="mode-btn" data-mode="de_el" data-label="🇩🇪 DE → EL" onclick="setMode(this)">🇬🇷 EL</button>
+      <button class="mode-btn" data-mode="de_hu" data-label="🇩🇪 DE → HU" onclick="setMode(this)">🇭🇺 HU</button>
+    </div>
+  </div>
+</div>
+
+<div class="chat" id="chat">
+  <div class="msg-row bot">
+    <div class="msg-meta">● Assistent</div>
+    <div class="msg bot">
+      Hallo! Ich bin dein KI-Assistent, betrieben auf dem Raspberry Pi 5.<br><br>
+      Wähle oben einen Modus — ich kann als Assistent antworten oder als Übersetzer zwischen <strong>17 europäischen Sprachen</strong> und Deutsch arbeiten.<br><br>
+      Schreibe eine Nachricht oder nutze das Mikrofon. 🎤
+    </div>
+  </div>
+  <div class="msg-row bot" id="typing-indicator">
+    <div class="typing-dots"><span></span><span></span><span></span></div>
+  </div>
+  <div class="tts-row" id="tts-indicator">
+    <div class="wave-bars"><span></span><span></span><span></span></div>
+    <span class="tts-label">wird vorgelesen...</span>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="input-row">
+    <button class="mic-btn" id="mic-btn" title="Spracheingabe starten" onclick="toggleMic()">🎤</button>
+    <input type="text" id="user-input" placeholder="Nachricht eingeben..." autocomplete="off" />
+    <button class="send-btn" onclick="sendMessage()" title="Senden">➤</button>
+  </div>
+  <div class="input-hint">Enter zum Senden · Mikrofon für Spracheingabe</div>
+  <div id="mic-status">
+    <span class="mic-wave"><span></span><span></span><span></span></span>
+    <span id="mic-status-text">Warte auf Sprache...</span>
+  </div>
+</div>
+
+<script>
+  var currentMode = 'assistent';
+  var currentLabel = '🤖 Assistent';
+  var isRecording = false;
+  var isWaiting = false;
+
+  document.getElementById('user-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  function setMode(btn) {
+    document.querySelectorAll('.mode-btn').forEach(function(b) {
+      b.classList.remove('active');
+    });
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    currentLabel = btn.dataset.label;
+    document.getElementById('current-mode-display').textContent = currentLabel;
+  }
+
+  function appendMessage(role, text, isError) {
+    var chat = document.getElementById('chat');
+    var typing = document.getElementById('typing-indicator');
+    var row = document.createElement('div');
+    row.className = 'msg-row ' + role;
+    var meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.textContent = role === 'user' ? '● Du' : ('● ' + currentLabel);
+    var bubble = document.createElement('div');
+    bubble.className = 'msg ' + role + (isError ? ' error' : '');
+    bubble.textContent = text;
+    row.appendChild(meta);
+    row.appendChild(bubble);
+    chat.insertBefore(row, typing);
+    chat.scrollTop = chat.scrollHeight;
+    return row;
+  }
+
+  function setMicStatus(active, text) {
+    var btn = document.getElementById('mic-btn');
+    var status = document.getElementById('mic-status');
+    var statusText = document.getElementById('mic-status-text');
+    if (active) {
+      btn.classList.add('recording');
+      btn.textContent = '🛑';
+      btn.title = 'Klicken zum Stoppen';
+      status.style.display = 'flex';
+      if (text) { statusText.textContent = text; }
+    } else {
+      btn.classList.remove('recording');
+      btn.textContent = '🎤';
+      btn.title = 'Spracheingabe starten';
+      status.style.display = 'none';
+    }
+  }
+
+  async function sendMessage() {
+    var input = document.getElementById('user-input');
+    var text = input.value.trim();
+    if (!text || isWaiting) { return; }
+    input.value = '';
+    appendMessage('user', text, false);
+    isWaiting = true;
+    var typing = document.getElementById('typing-indicator');
+    var tts = document.getElementById('tts-indicator');
+    if (typing) { typing.style.display = 'flex'; }
+    try {
+      var res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, modus: currentMode })
+      });
+      var data = await res.json();
+      if (typing) { typing.style.display = 'none'; }
+      if (data.error) {
+        appendMessage('bot', '⚠ Fehler: ' + data.error, true);
+      } else {
+        appendMessage('bot', data.reply, false);
+        if (tts) {
+          tts.style.display = 'flex';
+          var readTime = Math.max(2000, data.reply.split(' ').length * 350);
+          setTimeout(function() { if (tts) { tts.style.display = 'none'; } }, readTime);
+        }
+      }
+    } catch (err) {
+      if (typing) { typing.style.display = 'none'; }
+      appendMessage('bot', '⚠ Verbindungsfehler zum Server.', true);
+    }
+    isWaiting = false;
+    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+  }
+
+  async function toggleMic() {
+    // Wenn gerade aufgenommen wird → manuell stoppen
+    if (isRecording) {
+      await fetch('/stop_listen', { method: 'POST' });
+      setMicStatus(false, '');
+      isRecording = false;
+      return;
+    }
+    if (isWaiting) { return; }
+    isRecording = true;
+    setMicStatus(true, '🎤 Warte auf Sprache... (🛑 zum Stoppen)');
+    try {
+      var res = await fetch('/listen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modus: currentMode })
+      });
+      setMicStatus(true, '⏳ Verarbeite...');
+      var data = await res.json();
+      if (data.text) {
+        document.getElementById('user-input').value = data.text;
+        setMicStatus(false, '');
+        isRecording = false;
+        sendMessage();
+      } else {
+        setMicStatus(false, '');
+        isRecording = false;
+        appendMessage('bot', '⚠ Sprache nicht erkannt. Bitte nochmal versuchen.', true);
+      }
+    } catch (err) {
+      setMicStatus(false, '');
+      isRecording = false;
+      appendMessage('bot', '⚠ Mikrofon-Fehler.', true);
+    }
+  }
+
+  async function clearChat() {
+    await fetch('/clear', { method: 'POST' });
+    isWaiting = false;
+    isRecording = false;
+    setMicStatus(false, '');
+    var typing = document.getElementById('typing-indicator');
+    var tts = document.getElementById('tts-indicator');
+    if (typing) { typing.style.display = 'none'; }
+    if (tts) { tts.style.display = 'none'; }
+    var chat = document.getElementById('chat');
+    Array.from(chat.children).forEach(function(el) {
+      if (el.id !== 'typing-indicator' && el.id !== 'tts-indicator') {
+        el.remove();
+      }
+    });
+    appendMessage('bot', 'Chat geleert. Wie kann ich dir helfen?', false);
+  }
+</script>
+</body>
+</html>
