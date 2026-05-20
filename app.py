@@ -2,14 +2,14 @@ import os
 import threading
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
-import anthropic
+from openai import OpenAI
 from tts import speak
 from stt import listen
 
 load_dotenv()
 
 app = Flask(__name__)
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 MODI = {
     # Assistent
@@ -50,7 +50,7 @@ MODI = {
     "de_hu": "Du bist ein Übersetzer. Übersetze alles was der Nutzer schreibt vom Deutschen ins Ungarische. Gib NUR die Übersetzung aus, ohne Erklärungen.",
 }
 
-# Gesprächsverlauf (wird pro Session im Speicher gehalten)
+# Gesprächsverlauf
 conversation_history = []
 
 
@@ -68,7 +68,6 @@ def chat():
     if not user_input:
         return jsonify({"error": "Keine Eingabe"}), 400
 
-    # Unbekannten Modus abfangen
     if modus not in MODI:
         modus = "assistent"
 
@@ -79,14 +78,16 @@ def chat():
     })
 
     try:
-        response = client.messages.create(
-            model="claude-opus-4-6",
+        # OpenAI erwartet den System-Prompt als erstes Element
+        messages = [{"role": "system", "content": MODI[modus]}] + conversation_history
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
             max_tokens=1024,
-            system=MODI[modus],
-            messages=conversation_history
+            messages=messages
         )
 
-        reply = response.content[0].text
+        reply = response.choices[0].message.content
 
         # Antwort zum Verlauf hinzufügen
         conversation_history.append({
@@ -94,7 +95,7 @@ def chat():
             "content": reply
         })
 
-        # Sprachausgabe in eigenem Thread (blockiert nicht den Browser)
+        # Sprachausgabe in eigenem Thread
         threading.Thread(target=speak, args=(reply,), daemon=True).start()
 
         return jsonify({"reply": reply})
@@ -102,7 +103,7 @@ def chat():
     except Exception as e:
         # Bei Fehler die letzte User-Nachricht wieder entfernen
         conversation_history.pop()
-        print(f"Fehler bei Claude-Anfrage: {e}")
+        print(f"Fehler bei OpenAI-Anfrage: {e}")
         return jsonify({"error": str(e)}), 500
 
 
